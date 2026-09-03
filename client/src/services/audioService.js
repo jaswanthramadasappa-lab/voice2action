@@ -1,93 +1,171 @@
-const API_URL = "/api";
+// ========================================
+// Voice2Action API Service
+// ========================================
 
-// =========================
+// Local:
+// http://localhost:5000
+//
+// Production:
+// https://voice2action-n302.onrender.com
+
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://voice2action-n302.onrender.com";
+
+console.log("🌐 API URL:", API_URL);
+
+
+// ========================================
 // Upload Audio
-// =========================
+// ========================================
 
-export const uploadAudio = async (
-  audioBlob,
-  fileName = "recording.webm"
-) => {
-  const formData = new FormData();
+export async function uploadAudio(file, filename) {
+  try {
+    if (!file) {
+      throw new Error("Audio file is required.");
+    }
 
-  formData.append("audio", audioBlob, fileName);
+    const formData = new FormData();
 
-  const response = await fetch(`${API_URL}/audio/upload`, {
-    method: "POST",
-    body: formData,
-  });
+    formData.append("audio", file);
 
-  const data = await response.json();
+    if (filename) {
+      formData.append("filename", filename);
+    }
 
-  if (!response.ok) {
-    throw new Error(
-      data.message || "Audio upload failed"
+    console.log("📤 Uploading audio:", file.name);
+    console.log(
+      "📡 Upload URL:",
+      `${API_URL}/api/audio/upload`
     );
+
+    const response = await fetch(
+      `${API_URL}/api/audio/upload`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    const responseText = await response.text();
+
+    console.log(
+      "📥 Upload response:",
+      responseText
+    );
+
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      throw new Error(
+        `Server returned an invalid response: ${responseText.substring(
+          0,
+          150
+        )}`
+      );
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Audio upload failed."
+      );
+    }
+
+    return data;
+
+  } catch (error) {
+    console.error(
+      "❌ Upload Audio Error:",
+      error
+    );
+
+    throw error;
   }
-
-  return data;
-};
+}
 
 
-// =========================
+// ========================================
 // Transcribe Audio
-// =========================
+// ========================================
 
-export const transcribeAudio = async (filename) => {
-  const response = await fetch(
-    `${API_URL}/transcription/transcribe`,
-    {
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/json",
-      },
-
-      body: JSON.stringify({
-        filename,
-      }),
+export async function transcribeAudio(filename) {
+  try {
+    if (!filename) {
+      throw new Error(
+        "Audio filename is required."
+      );
     }
-  );
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data.message || "Transcription failed"
+    console.log(
+      "🎙️ Transcribing:",
+      filename
     );
-  }
 
-  return data;
-};
+    console.log(
+      "📡 Transcription URL:",
+      `${API_URL}/api/transcription/transcribe`
+    );
 
+    const response = await fetch(
+      `${API_URL}/api/transcription/transcribe`,
+      {
+        method: "POST",
 
-// =========================
-// Generate AI Summary
-// =========================
+        headers: {
+          "Content-Type": "application/json",
+        },
 
-export const generateSummary = async (transcript) => {
-  const response = await fetch(
-    `${API_URL}/summary/generate`,
-    {
-      method: "POST",
+        body: JSON.stringify({
+          filename,
+        }),
+      }
+    );
 
-      headers: {
-        "Content-Type": "application/json",
-      },
+    const responseText =
+      await response.text();
 
-      body: JSON.stringify({
-        transcript,
-      }),
+    console.log(
+      "📥 Transcription response:",
+      responseText
+    );
+
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      throw new Error(
+        `Server returned an invalid response: ${responseText.substring(
+          0,
+          150
+        )}`
+      );
     }
-  );
 
-  const data = await response.json();
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+          "Transcription failed."
+      );
+    }
 
-  if (!response.ok) {
-    throw new Error(
-      data.message || "AI analysis failed"
+    return data;
+
+  } catch (error) {
+    console.error(
+      "❌ Transcription Error:",
+      error
     );
-  }
 
-  return data;
-};
+    throw error;
+  }
+}
+
+
+// ========================================
+// Export API URL
+// ========================================
+
+export { API_URL };
