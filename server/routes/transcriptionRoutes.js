@@ -7,15 +7,24 @@ const OpenAI = require("openai");
 
 const router = express.Router();
 
+// =========================
+// AI Configuration
+// =========================
+
 const USE_MOCK_AI =
   String(process.env.USE_MOCK_AI).toLowerCase() === "true";
 
 let openai = null;
 
-if (!USE_MOCK_AI) {
+if (process.env.OPENAI_API_KEY) {
   openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
+
+  console.log("✅ OpenAI API enabled");
+} else {
+  console.log("🧪 OpenAI API key not found");
+  console.log("🧪 MOCK AI MODE will be used");
 }
 
 // =========================
@@ -26,12 +35,20 @@ router.post("/transcribe", async (req, res) => {
   try {
     const { filename } = req.body;
 
+    // =========================
+    // Validate filename
+    // =========================
+
     if (!filename) {
       return res.status(400).json({
         success: false,
         message: "Audio filename is required",
       });
     }
+
+    // =========================
+    // Audio path
+    // =========================
 
     const audioPath = path.join(
       __dirname,
@@ -47,7 +64,13 @@ router.post("/transcribe", async (req, res) => {
     console.log("📁 Filename:", filename);
     console.log("📍 Audio path:", audioPath);
 
+    // =========================
+    // Check audio file
+    // =========================
+
     if (!fs.existsSync(audioPath)) {
+      console.error("❌ Audio file not found");
+
       return res.status(404).json({
         success: false,
         message: "Audio file not found on server",
@@ -58,7 +81,7 @@ router.post("/transcribe", async (req, res) => {
     // MOCK AI MODE
     // =========================
 
-    if (USE_MOCK_AI) {
+    if (USE_MOCK_AI || !openai) {
       console.log("🧪 MOCK AI MODE ENABLED");
       console.log("⏳ Generating mock transcript...");
 
@@ -66,6 +89,8 @@ router.post("/transcribe", async (req, res) => {
         "This is a sample transcript generated for testing. " +
         "The user wants to complete the project, " +
         "prepare the report, and share the completed work with the team.";
+
+      console.log("✅ Mock transcription completed");
 
       return res.json({
         success: true,
