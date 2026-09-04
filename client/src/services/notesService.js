@@ -1,32 +1,28 @@
-const API_URL = "http://localhost:5000/api/notes";
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api";
+
+const NOTES_URL = `${API_URL}/notes`;
 
 // =========================
 // Save Note
 // =========================
 
-export async function saveNote({
-  transcript,
-  result,
-}) {
+export async function saveNote({ transcript, result }) {
   if (!transcript || !result) {
-    throw new Error(
-      "Transcript or AI result is missing."
-    );
+    throw new Error("Transcript or AI result is missing.");
   }
 
-  const response = await fetch(
-    `${API_URL}/save`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        transcript,
-        result,
-      }),
-    }
-  );
+  const response = await fetch(`${NOTES_URL}/save`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      transcript,
+      result,
+    }),
+  });
 
   const data = await response.json();
 
@@ -39,13 +35,12 @@ export async function saveNote({
   return data.note;
 }
 
-
 // =========================
 // Get Notes
 // =========================
 
 export async function getNotes() {
-  const response = await fetch(API_URL);
+  const response = await fetch(NOTES_URL);
 
   const data = await response.json();
 
@@ -58,18 +53,14 @@ export async function getNotes() {
   return data.notes || [];
 }
 
-
 // =========================
 // Delete Note
 // =========================
 
 export async function deleteNote(id) {
-  const response = await fetch(
-    `${API_URL}/${id}`,
-    {
-      method: "DELETE",
-    }
-  );
+  const response = await fetch(`${NOTES_URL}/${id}`, {
+    method: "DELETE",
+  });
 
   const data = await response.json();
 
