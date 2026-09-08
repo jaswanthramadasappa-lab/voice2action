@@ -8,7 +8,9 @@
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  "https://voice2action-n302.onrender.com";
+  (typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:5000"
+    : "https://voice2action-n302.onrender.com");
 
 console.log("🌐 Voice2Action API URL:", API_URL);
 

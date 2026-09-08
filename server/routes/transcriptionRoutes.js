@@ -3,29 +3,9 @@ require("dotenv").config();
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const OpenAI = require("openai");
+const { transcribeAudioFile } = require("../services/aiService");
 
 const router = express.Router();
-
-// =========================
-// AI Configuration
-// =========================
-
-const USE_MOCK_AI =
-  String(process.env.USE_MOCK_AI).toLowerCase() === "true";
-
-let openai = null;
-
-if (process.env.OPENAI_API_KEY) {
-  openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-
-  console.log("✅ OpenAI API enabled");
-} else {
-  console.log("🧪 OpenAI API key not found");
-  console.log("🧪 MOCK AI MODE will be used");
-}
 
 // =========================
 // POST /transcribe
@@ -78,76 +58,27 @@ router.post("/transcribe", async (req, res) => {
     }
 
     // =========================
-    // MOCK AI MODE
+    // Perform Real / Fallback Transcription
     // =========================
 
-    if (USE_MOCK_AI || !openai) {
-      console.log("🧪 MOCK AI MODE ENABLED");
-      console.log("⏳ Generating mock transcript...");
+    const result = await transcribeAudioFile(audioPath);
 
-      const mockTranscript =
-        "This is a sample transcript generated for testing. " +
-        "The user wants to complete the project, " +
-        "prepare the report, and share the completed work with the team.";
+    console.log("✅ Transcription completed:", result);
 
-      console.log("✅ Mock transcription completed");
-
-      return res.json({
-        success: true,
-        text: mockTranscript,
-        filename,
-        mock: true,
-      });
-    }
-
-    // =========================
-    // REAL OPENAI MODE
-    // =========================
-
-    console.log("🤖 Sending audio to OpenAI Whisper API (whisper-1)...");
-
-    try {
-      const transcription =
-        await openai.audio.transcriptions.create({
-          file: fs.createReadStream(audioPath),
-          model: "whisper-1",
-        });
-
-      console.log("✅ Transcription completed");
-
-      return res.json({
-        success: true,
-        text: transcription.text,
-        filename,
-        mock: false,
-      });
-    } catch (apiError) {
-      console.error("⚠️ OpenAI Whisper API call failed:", apiError.message);
-
-      // If OpenAI call fails due to invalid key or quota, fallback gracefully if desired
-      if (process.env.FALLBACK_ON_AI_ERROR === "true") {
-        console.log("🔄 Falling back to mock transcript due to OpenAI error...");
-        return res.json({
-          success: true,
-          text:
-            "This is a fallback transcript generated because the OpenAI service encountered an error. " +
-            "The user wants to complete the project, prepare the report, and share the completed work with the team.",
-          filename,
-          mock: true,
-          fallbackReason: apiError.message,
-        });
-      }
-
-      throw apiError;
-    }
+    return res.json({
+      success: true,
+      text: result.text,
+      filename,
+      mock: result.mock,
+      provider: result.provider,
+    });
 
   } catch (error) {
     console.error("❌ TRANSCRIPTION ERROR:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        error.message || "Speech-to-text failed",
+      message: error.message || "Speech-to-text failed",
     });
   }
 });
