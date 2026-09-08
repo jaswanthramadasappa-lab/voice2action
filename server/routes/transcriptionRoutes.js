@@ -104,22 +104,42 @@ router.post("/transcribe", async (req, res) => {
     // REAL OPENAI MODE
     // =========================
 
-    console.log("🤖 Sending audio to OpenAI...");
+    console.log("🤖 Sending audio to OpenAI Whisper API (whisper-1)...");
 
-    const transcription =
-      await openai.audio.transcriptions.create({
-        file: fs.createReadStream(audioPath),
-        model: "gpt-4o-mini-transcribe",
+    try {
+      const transcription =
+        await openai.audio.transcriptions.create({
+          file: fs.createReadStream(audioPath),
+          model: "whisper-1",
+        });
+
+      console.log("✅ Transcription completed");
+
+      return res.json({
+        success: true,
+        text: transcription.text,
+        filename,
+        mock: false,
       });
+    } catch (apiError) {
+      console.error("⚠️ OpenAI Whisper API call failed:", apiError.message);
 
-    console.log("✅ Transcription completed");
+      // If OpenAI call fails due to invalid key or quota, fallback gracefully if desired
+      if (process.env.FALLBACK_ON_AI_ERROR === "true") {
+        console.log("🔄 Falling back to mock transcript due to OpenAI error...");
+        return res.json({
+          success: true,
+          text:
+            "This is a fallback transcript generated because the OpenAI service encountered an error. " +
+            "The user wants to complete the project, prepare the report, and share the completed work with the team.",
+          filename,
+          mock: true,
+          fallbackReason: apiError.message,
+        });
+      }
 
-    return res.json({
-      success: true,
-      text: transcription.text,
-      filename,
-      mock: false,
-    });
+      throw apiError;
+    }
 
   } catch (error) {
     console.error("❌ TRANSCRIPTION ERROR:", error);
