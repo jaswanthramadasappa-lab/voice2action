@@ -8,34 +8,13 @@ const noteSchema = new mongoose.Schema(
     },
 
     result: {
-      summary: {
-        type: String,
-        default: "",
-      },
-
-      keyPoints: {
-        type: [String],
-        default: [],
-      },
-
-      actionItems: {
-        type: [
-          {
-            task: String,
-            priority: String,
-          },
-        ],
-        default: [],
-      },
-
-      decisions: {
-        type: [String],
-        default: [],
-      },
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
     },
   },
   {
     timestamps: true,
+    strict: false,
   }
 );
 

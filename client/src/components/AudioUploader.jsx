@@ -97,7 +97,13 @@ function AudioUploader({ setTranscript }) {
         setTranscript(result.text);
       }
 
-      setMessage("✅ Transcription completed.");
+      if (result.mock) {
+        setMessage(
+          "⚠️ AI Speech-to-Text API quota exhausted (OpenAI credits: 0). Fallback text loaded. Add a free Groq or Gemini API key to server/.env for real audio file transcription, or use 'Start Real-Time Recording' with your mic."
+        );
+      } else {
+        setMessage(`✅ Audio transcribed successfully via ${result.provider || "AI"}!`);
+      }
 
     } catch (error) {
       console.error("❌ Transcription failed:", error);

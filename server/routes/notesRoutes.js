@@ -1,7 +1,16 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const Note = require("../models/Note");
 
 const router = express.Router();
+
+async function ensureDbConnected() {
+  if (mongoose.connection.readyState !== 1 && process.env.MONGODB_URI) {
+    console.log("🔄 Reconnecting to MongoDB...");
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log("✅ Reconnected to MongoDB");
+  }
+}
 
 // =========================
 // Save Note
@@ -9,7 +18,9 @@ const router = express.Router();
 
 router.post("/save", async (req, res) => {
   try {
-    const { transcript, result } = req.body;
+    await ensureDbConnected();
+
+    let { transcript, result } = req.body;
 
     if (!transcript || !result) {
       return res.status(400).json({
@@ -18,10 +29,51 @@ router.post("/save", async (req, res) => {
       });
     }
 
+    // Clone and sanitize result structure
+    const sanitizedResult = typeof result === "object" ? { ...result } : { summary: String(result) };
+
+    // Normalize actionItems so it is always a valid array of objects
+    if (Array.isArray(sanitizedResult.actionItems)) {
+      sanitizedResult.actionItems = sanitizedResult.actionItems.map((item) => {
+        if (typeof item === "string") {
+          return { task: item, priority: "Medium" };
+        }
+        if (item && typeof item === "object") {
+          return {
+            task: String(item.task || item.description || item.text || "Action item"),
+            priority: String(item.priority || "Medium"),
+          };
+        }
+        return { task: String(item), priority: "Medium" };
+      });
+    } else {
+      sanitizedResult.actionItems = [];
+    }
+
+    // Normalize keyPoints
+    if (Array.isArray(sanitizedResult.keyPoints)) {
+      sanitizedResult.keyPoints = sanitizedResult.keyPoints.map((k) =>
+        typeof k === "string" ? k : String(k?.point || k?.text || JSON.stringify(k))
+      );
+    } else {
+      sanitizedResult.keyPoints = [];
+    }
+
+    // Normalize decisions
+    if (Array.isArray(sanitizedResult.decisions)) {
+      sanitizedResult.decisions = sanitizedResult.decisions.map((d) =>
+        typeof d === "string" ? d : String(d?.decision || d?.text || JSON.stringify(d))
+      );
+    } else {
+      sanitizedResult.decisions = [];
+    }
+
     const note = await Note.create({
-      transcript,
-      result,
+      transcript: typeof transcript === "string" ? transcript : JSON.stringify(transcript),
+      result: sanitizedResult,
     });
+
+    console.log("✅ Note saved successfully:", note._id);
 
     res.status(201).json({
       success: true,
@@ -33,7 +85,7 @@ router.post("/save", async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Failed to save note.",
+      message: error.message || "Failed to save note.",
     });
   }
 });
@@ -44,8 +96,9 @@ router.post("/save", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const notes = await Note.find()
-      .sort({ createdAt: -1 });
+    await ensureDbConnected();
+
+    const notes = await Note.find().sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -56,7 +109,7 @@ router.get("/", async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Failed to fetch notes.",
+      message: error.message || "Failed to fetch notes.",
     });
   }
 });
@@ -67,6 +120,8 @@ router.get("/", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   try {
+    await ensureDbConnected();
+
     await Note.findByIdAndDelete(req.params.id);
 
     res.json({
@@ -78,7 +133,7 @@ router.delete("/:id", async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Failed to delete note.",
+      message: error.message || "Failed to delete note.",
     });
   }
 });

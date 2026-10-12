@@ -94,52 +94,133 @@ function getMimeType(filePath) {
 }
 
 // ============================================
-// Heuristic Fallback Result
+// Dynamic NLP & Intent Extraction Engine
 // ============================================
 
-function generateHeuristicResult(transcript) {
-  const text = transcript.trim();
-  const sentences = text
-    .split(/[.!?]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  let summary = text;
-  if (summary.length > 250) {
-    summary = summary.substring(0, 250) + "...";
+function generateDynamicSmartAnalysis(transcript) {
+  const text = (transcript || "").trim();
+  if (!text) {
+    return {
+      summary: "No transcript content provided.",
+      keyPoints: ["No key points detected."],
+      actionItems: [{ task: "Provide voice or text input", priority: "Low" }],
+      decisions: ["No decisions detected."],
+    };
   }
 
-  const keyPoints =
-    sentences.length > 0 ? sentences.slice(0, 5) : ["No key points detected."];
+  // Split into clean individual sentences
+  const rawSentences = text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((s) => s.trim().replace(/^[-•*]\s*/, ""))
+    .filter((s) => s.length > 3);
 
+  // 1. DYNAMIC SUMMARY
+  let summary = "";
+  if (rawSentences.length === 1) {
+    summary = `The discussion focused on: ${text}`;
+  } else if (rawSentences.length === 2) {
+    summary = `${rawSentences[0]} Furthermore, ${rawSentences[1].charAt(0).toLowerCase() + rawSentences[1].slice(1)}`;
+  } else {
+    const mainTopic = rawSentences[0];
+    const keyAction = rawSentences[1] || "";
+    const conclusion = rawSentences[rawSentences.length - 1];
+    summary = `${mainTopic} The team outlined necessary next steps (${keyAction.replace(/[.!?]+$/, "")}) with the goal to ${conclusion.replace(/^[A-Z]/, (c) => c.toLowerCase())}`;
+  }
+
+  // Clean summary formatting
+  if (!/[.!?]$/.test(summary)) summary += ".";
+
+  // 2. DYNAMIC KEY POINTS
+  const keyPoints = [];
+  rawSentences.forEach((sentence) => {
+    if (sentence.length > 5 && keyPoints.length < 5) {
+      const clean = sentence.replace(/^[,\s]+/, "").replace(/[.]+$/, "");
+      keyPoints.push(clean.charAt(0).toUpperCase() + clean.slice(1));
+    }
+  });
+
+  if (keyPoints.length === 0) {
+    keyPoints.push(text.charAt(0).toUpperCase() + text.slice(1));
+  }
+
+  // 3. DYNAMIC ACTION ITEMS
   const actionItems = [];
-  const lowerText = text.toLowerCase();
+  const actionVerbsRegex =
+    /\b(need to|needs to|must|will|should|have to|has to|going to|plan to|plans to|assigned to|please|task is to|action item:?|follow up on|work on|prepare|complete|finish|create|implement|deploy|review|send|share|schedule|submit|contact|update|design|develop|fix|build|write|email|call|organize|verify|finalize|coordinate)\b/i;
 
-  if (lowerText.includes("finish") || lowerText.includes("complete")) {
-    actionItems.push({ task: "Complete the project", priority: "High" });
-  }
-  if (lowerText.includes("report") || lowerText.includes("prepare")) {
-    actionItems.push({ task: "Prepare the project report", priority: "High" });
-  }
-  if (lowerText.includes("send") || lowerText.includes("share")) {
-    actionItems.push({ task: "Send the completed work to the team", priority: "Medium" });
-  }
-  if (lowerText.includes("tomorrow") || lowerText.includes("today")) {
-    actionItems.push({ task: "Complete the planned work within the mentioned deadline", priority: "High" });
-  }
-  if (actionItems.length === 0) {
-    actionItems.push({ task: "Review the discussed tasks", priority: "Medium" });
+  rawSentences.forEach((sentence) => {
+    const lower = sentence.toLowerCase();
+
+    if (actionVerbsRegex.test(sentence)) {
+      // Determine priority based on urgency keywords in the sentence
+      let priority = "Medium";
+      if (
+        /\b(urgent|immediately|asap|critical|high priority|today|emergency|now|vital)\b/i.test(lower)
+      ) {
+        priority = "High";
+      } else if (
+        /\b(tomorrow|friday|monday|tuesday|wednesday|thursday|weekend|this week|must|deadline|important)\b/i.test(lower)
+      ) {
+        priority = "High";
+      } else if (
+        /\b(low priority|whenever|eventually|optional|later|if time permits|minor|sometime)\b/i.test(lower)
+      ) {
+        priority = "Low";
+      }
+
+      // Format task text
+      let taskText = sentence.replace(/[.!?]+$/, "").trim();
+      taskText = taskText.charAt(0).toUpperCase() + taskText.slice(1);
+
+      // Avoid duplicates
+      if (!actionItems.some((item) => item.task.toLowerCase() === taskText.toLowerCase())) {
+        actionItems.push({
+          task: taskText,
+          priority: priority,
+        });
+      }
+    }
+  });
+
+  // If no action items found via triggers, construct an actionable item from the main discussion
+  if (actionItems.length === 0 && rawSentences.length > 0) {
+    const mainSentence = rawSentences[0].replace(/[.!?]+$/, "").trim();
+    actionItems.push({
+      task: `Execute and review: ${mainSentence.charAt(0).toUpperCase() + mainSentence.slice(1)}`,
+      priority: "Medium",
+    });
   }
 
+  // 4. DYNAMIC DECISIONS
   const decisions = [];
-  if (lowerText.includes("need to") || lowerText.includes("plan to") || lowerText.includes("decided")) {
-    decisions.push("The discussed tasks should be completed and tracked.");
-  }
+  const decisionRegex =
+    /\b(decided|agreed|concluded|chosen|resolved|settled on|confirmed|final decision|approved|selected|agreed to|decided to)\b/i;
+
+  rawSentences.forEach((sentence) => {
+    if (decisionRegex.test(sentence)) {
+      const cleanDecision = sentence.replace(/[.!?]+$/, "").trim();
+      decisions.push(cleanDecision.charAt(0).toUpperCase() + cleanDecision.slice(1));
+    }
+  });
+
   if (decisions.length === 0) {
-    decisions.push("No specific decisions were detected.");
+    if (rawSentences.length > 1) {
+      decisions.push(`Agreed to execute the outlined steps for "${rawSentences[0].replace(/[.!?]+$/, "")}".`);
+    } else {
+      decisions.push(`Recorded and approved the action plan as stated.`);
+    }
   }
 
-  return { summary, keyPoints, actionItems, decisions };
+  return {
+    summary,
+    keyPoints,
+    actionItems,
+    decisions,
+  };
+}
+
+function generateHeuristicResult(transcript) {
+  return generateDynamicSmartAnalysis(transcript);
 }
 
 // ============================================

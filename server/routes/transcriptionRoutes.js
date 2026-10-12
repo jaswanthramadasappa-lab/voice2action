@@ -13,7 +13,7 @@ const router = express.Router();
 
 router.post("/transcribe", async (req, res) => {
   try {
-    const { filename } = req.body;
+    const { filename, clientTranscript } = req.body;
 
     // =========================
     // Validate filename
@@ -43,6 +43,9 @@ router.post("/transcribe", async (req, res) => {
     console.log("=================================");
     console.log("📁 Filename:", filename);
     console.log("📍 Audio path:", audioPath);
+    if (clientTranscript) {
+      console.log("🎤 Client Real-Time Transcript Provided:", clientTranscript);
+    }
 
     // =========================
     // Check audio file
@@ -65,12 +68,20 @@ router.post("/transcribe", async (req, res) => {
 
     console.log("✅ Transcription completed:", result);
 
+    const hasClientSpeech = Boolean(clientTranscript && clientTranscript.trim());
+    const finalTranscriptText = (result.mock && hasClientSpeech)
+      ? clientTranscript.trim()
+      : result.text;
+    const finalProvider = (result.mock && hasClientSpeech)
+      ? "realtime-web-speech"
+      : result.provider;
+
     return res.json({
       success: true,
-      text: result.text,
+      text: finalTranscriptText,
       filename,
-      mock: result.mock,
-      provider: result.provider,
+      mock: (result.mock && !hasClientSpeech),
+      provider: finalProvider,
     });
 
   } catch (error) {

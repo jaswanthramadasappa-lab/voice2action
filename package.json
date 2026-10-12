@@ -1,0 +1,13 @@
+{
+  "name": "voice2action-ai-project",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix client run build",
+    "build:client": "npm --prefix client run build",
+    "dev": "npm --prefix client run dev",
+    "client": "npm --prefix client run dev",
+    "server": "node server/server.js",
+    "start": "node server/server.js"
+  }
+}

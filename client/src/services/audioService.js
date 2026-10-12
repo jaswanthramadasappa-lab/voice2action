@@ -6,11 +6,14 @@
 // Local backend: http://localhost:5000
 // Production backend: https://voice2action-n302.onrender.com
 
-const API_URL =
+const rawApiUrl =
   import.meta.env.VITE_API_URL ||
-  (typeof window !== "undefined" && window.location.hostname === "localhost"
+  (typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
     ? "http://localhost:5000"
     : "https://voice2action-n302.onrender.com");
+
+const API_URL = rawApiUrl.replace(/\/api\/?$/, "").replace(/\/+$/, "");
 
 console.log("🌐 Voice2Action API URL:", API_URL);
 
@@ -104,7 +107,7 @@ export async function uploadAudio(file, filename) {
 // Transcribe Audio
 // ========================================
 
-export async function transcribeAudio(filename) {
+export async function transcribeAudio(filename, clientTranscript) {
   try {
     if (!filename) {
       throw new Error(
@@ -116,6 +119,9 @@ export async function transcribeAudio(filename) {
     console.log("🎙️ AUDIO TRANSCRIPTION");
     console.log("=================================");
     console.log("Filename:", filename);
+    if (clientTranscript) {
+      console.log("Real-time live transcript provided:", clientTranscript);
+    }
 
     const response = await fetch(
       `${API_URL}/api/transcription/transcribe`,
@@ -128,6 +134,7 @@ export async function transcribeAudio(filename) {
 
         body: JSON.stringify({
           filename: filename,
+          clientTranscript: clientTranscript || undefined,
         }),
       }
     );
